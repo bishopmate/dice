@@ -59,9 +59,12 @@ func readInt64(data []byte) (int64, int, error) {
 // the string, the delta, and the error
 func readBulkString(data []byte) (string, int, error) {
 
-	length, startingPosition := readLength(data[1:])
+	pos := 1
 
-	return string(data[startingPosition : startingPosition+length]), startingPosition + length + 2, nil
+	length, delta := readLength(data[pos:])
+	pos += delta
+
+	return string(data[pos : pos+length]), pos + length + 2, nil
 }
 
 // reads a RESP encoded array from data and returns
@@ -87,12 +90,16 @@ func readArray(data []byte) (interface{}, int, error) {
 
 func DecodeOne(data []byte) (interface{}, int, error) {
 	if len(data) == 0 {
-		return nil, 0, errors.New("No data")
+		return nil, 0, errors.New("no data")
 	}
 
 	switch data[0] {
 	case '+':
 		return readSimpleString(data)
+	case '-':
+		return readError(data)
+	case ':':
+		return readInt64(data)
 	case '$':
 		return readBulkString(data)
 	case '*':
@@ -104,7 +111,7 @@ func DecodeOne(data []byte) (interface{}, int, error) {
 
 func Decode(data []byte) (interface{}, error) {
 	if len(data) == 0 {
-		return nil, errors.New("No data")
+		return nil, errors.New("no data")
 	}
 	value, _, err := DecodeOne(data)
 	return value, err
