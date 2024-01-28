@@ -1,17 +1,25 @@
 package server
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/bishopmate/dice/config"
+	"github.com/bishopmate/dice/core"
 )
 
-func respond(command string, connection net.Conn) error {
-	if _, err := connection.Write([]byte(command)); err != nil {
-		return err
+func respondError(err error, c net.Conn) {
+	c.Write([]byte(fmt.Sprintf("-%s\r\n", err)))
+}
+
+func respond(command *core.RedisCmd, connection net.Conn) error {
+	err := core.EvalAndRespond(command, connection)
+	if err != nil {
+		respondError(err, connection)
 	}
 	return nil
 }
@@ -19,15 +27,25 @@ func respond(command string, connection net.Conn) error {
 // TODO: Max read in one shot is 512 bytes
 // To allow input > 512 bytes, do repeated read until
 // we get EOF or designated delimiter
-func readCommand(connection net.Conn) (string, error) {
+func readCommand(connection net.Conn) (*core.RedisCmd, error) {
 	var buf []byte = make([]byte, 2048)
 	// println("command", buf)
-	n, err := connection.Read(buf[:])
+	_, err := connection.Read(buf[:])
 	// println("n", n)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(buf[:n]), nil
+
+	commandTokens, err := core.DecodeArrayString(buf)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &core.RedisCmd{
+		Cmd:  strings.ToUpper(commandTokens[0]),
+		Args: commandTokens[1:],
+	}, nil
 }
 
 func RunSyncTCPServer() {

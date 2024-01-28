@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 )
 
@@ -86,6 +87,33 @@ func readArray(data []byte) (interface{}, int, error) {
 	}
 
 	return elements, pos, nil
+}
+
+func DecodeArrayString(data []byte) ([]string, error) {
+	value, err := Decode(data)
+	if err != nil {
+		return nil, err
+	}
+	stringTokens := value.([]interface{})
+	tokens := make([]string, len(stringTokens))
+	for i := range tokens {
+		tokens[i] = stringTokens[i].(string)
+	}
+
+	return tokens, nil
+}
+
+func Encode(value interface{}, isSimple bool) []byte {
+	switch v := value.(type) {
+	case string:
+		if isSimple {
+			return []byte(fmt.Sprintf("+%s\r\n", v))
+		} else {
+			return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(v), v))
+		}
+	default:
+		return []byte{}
+	}
 }
 
 func DecodeOne(data []byte) (interface{}, int, error) {
